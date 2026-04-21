@@ -1,7 +1,4 @@
 // components/dashboard/admin/content/ImageUploader.tsx
-// Reusable image uploader — signs via /api/admin/upload, then POSTs directly
-// to Cloudinary. Returns the secure_url to the parent via onUpload().
-/*eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -9,22 +6,26 @@ import { ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 
 interface ImageUploaderProps {
-  value:      string;                    // current URL (controlled)
-  onChange:   (url: string) => void;     // called with new URL after upload
-  folder?:    string;                    // Cloudinary folder (default: admin-content)
-  label?:     string;
+  value: string;
+  onChange: (url: string) => void;
+  folder?: string;
+  label?: string;
   className?: string;
 }
 
 type UploadState = "idle" | "signing" | "uploading" | "done" | "error";
 
 export default function ImageUploader({
-  value, onChange, folder = "admin-content", label = "Featured Image", className,
+  value = "", // Provide default empty string
+  onChange,
+  folder = "admin-content",
+  label = "Featured Image",
+  className,
 }: ImageUploaderProps) {
-  const [state,    setState]    = useState<UploadState>("idle");
+  const [state, setState] = useState<UploadState>("idle");
   const [progress, setProgress] = useState(0);
-  const [errMsg,   setErrMsg]   = useState<string | null>(null);
-  const [preview,  setPreview]  = useState<string | null>(null);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const displayUrl = value || preview || null;
@@ -39,30 +40,29 @@ export default function ImageUploader({
       return;
     }
 
-    // Local preview immediately
     setPreview(URL.createObjectURL(file));
     setErrMsg(null);
     setState("signing");
     setProgress(0);
 
     try {
-      // 1. Get signature from our API
       const signRes = await fetch("/api/admin/upload", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ folder }),
+        body: JSON.stringify({ folder }),
       });
+      
       if (!signRes.ok) throw new Error("Failed to get upload signature");
+      
       const { signature, timestamp, apiKey, cloudName, folder: signedFolder } = await signRes.json();
 
-      // 2. Upload directly to Cloudinary
       setState("uploading");
       const formData = new FormData();
-      formData.append("file",       file);
-      formData.append("api_key",    apiKey);
-      formData.append("timestamp",  String(timestamp));
-      formData.append("signature",  signature);
-      formData.append("folder",     signedFolder);
+      formData.append("file", file);
+      formData.append("api_key", apiKey);
+      formData.append("timestamp", String(timestamp));
+      formData.append("signature", signature);
+      formData.append("folder", signedFolder);
 
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -87,7 +87,6 @@ export default function ImageUploader({
         xhr.onerror = () => reject(new Error("Network error during upload"));
         xhr.send(formData);
       });
-
     } catch (err: any) {
       setErrMsg(err.message ?? "Upload failed");
       setState("error");
@@ -104,7 +103,6 @@ export default function ImageUploader({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFile(file);
-    // Reset so same file can be re-selected
     e.target.value = "";
   };
 
@@ -124,7 +122,6 @@ export default function ImageUploader({
         <p className="text-xs text-muted-foreground font-medium">{label}</p>
       )}
 
-      {/* ── Preview ──────────────────────────────────────────────────── */}
       {displayUrl ? (
         <div className="relative rounded-xl overflow-hidden border border-border bg-muted group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -138,7 +135,6 @@ export default function ImageUploader({
             onError={(e) => (e.currentTarget.style.display = "none")}
           />
 
-          {/* Progress overlay */}
           {isLoading && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/60">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -154,7 +150,6 @@ export default function ImageUploader({
             </div>
           )}
 
-          {/* Controls overlay — shown on hover when not loading */}
           {!isLoading && (
             <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
               <button
@@ -175,7 +170,6 @@ export default function ImageUploader({
           )}
         </div>
       ) : (
-        /* ── Drop zone ──────────────────────────────────────────────── */
         <div
           role="button"
           tabIndex={0}
@@ -222,31 +216,33 @@ export default function ImageUploader({
         </div>
       )}
 
-      {/* ── URL input fallback ─────────────────────────────────────── */}
       <div className="flex items-center gap-2">
         <div className="h-px flex-1 bg-border" />
         <span className="text-[10px] text-muted-foreground uppercase tracking-wide">or paste URL</span>
         <div className="h-px flex-1 bg-border" />
       </div>
+      
       <input
         type="url"
         placeholder="https://res.cloudinary.com/…"
-        value={value}
-        onChange={(e) => { onChange(e.target.value); setState("idle"); setPreview(null); }}
+        value={value || ""} // Ensure value is never undefined
+        onChange={(e) => { 
+          onChange(e.target.value); 
+          setState("idle"); 
+          setPreview(null); 
+        }}
         className={cn(
           "w-full h-9 rounded-md border border-input bg-background px-3 text-sm",
           "placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
         )}
       />
 
-      {/* ── Error ───────────────────────────────────────────────────── */}
       {errMsg && (
         <p className="text-xs text-red-600 flex items-center gap-1">
           <X className="h-3 w-3" /> {errMsg}
         </p>
       )}
 
-      {/* Hidden file input */}
       <input
         ref={inputRef}
         type="file"

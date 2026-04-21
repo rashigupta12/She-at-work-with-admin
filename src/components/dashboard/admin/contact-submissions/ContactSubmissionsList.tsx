@@ -8,11 +8,12 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import {
   BookOpen, Check, Eye, Mail, MessageSquare,
-  RefreshCw, Search, User, X, XCircle,
+  RefreshCw, Search, Trash2, User, X, XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Swal from "sweetalert2";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,11 +53,13 @@ export default function ContactSubmissionsList() {
   const [debSearch,  setDebSearch]  = useState("");
   const [page,       setPage]       = useState(1);
   const [toast,      setToast]      = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   const debRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, isError = false) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
   };
@@ -73,7 +76,11 @@ export default function ContactSubmissionsList() {
     return () => { if (debRef.current) clearTimeout(debRef.current); };
   }, [search]);
 
-  useEffect(() => { setPage(1); }, [isResolved]);
+  useEffect(() => { 
+    setPage(1); 
+    setSelectedIds(new Set()); // Clear selection when tab changes
+    setSelectAll(false);
+  }, [isResolved]);
 
   const fetchData = useCallback(async () => {
     if (abortRef.current) abortRef.current.abort();
@@ -91,6 +98,8 @@ export default function ContactSubmissionsList() {
       const data = await res.json();
       setItems(data.data ?? []);
       setPagination(data.pagination ?? { page:1, limit:20, total:0, totalPages:0 });
+      setSelectedIds(new Set()); // Clear selection on new data
+      setSelectAll(false);
     } catch (err: any) {
       if (err.name === "AbortError") return;
       setError(true);
@@ -100,6 +109,28 @@ export default function ContactSubmissionsList() {
   }, [page, isResolved, debSearch]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Handle select all
+  useEffect(() => {
+    if (selectAll) {
+      const allIds = items.map(item => item.id);
+      setSelectedIds(new Set(allIds));
+    } else {
+      setSelectedIds(new Set());
+    }
+  }, [selectAll, items]);
+
+  // Handle individual selection
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+    setSelectAll(false);
+  };
 
   // Quick-resolve directly from list without leaving page
   const quickResolve = async (item: ContactItem) => {
@@ -117,17 +148,77 @@ export default function ContactSubmissionsList() {
     }
   };
 
+  // Bulk delete with confirmation
+  const bulkDelete = async () => {
+    if (selectedIds.size === 0) {
+      showToast("No messages selected", true);
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: 'Delete Messages?',
+      html: `Are you sure you want to delete <strong>${selectedIds.size}</strong> message${selectedIds.size !== 1 ? 's' : ''}?<br/><br/>This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete them!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await fetch('/api/admin/contact-submissions/bulk-delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: Array.from(selectedIds) }),
+        });
+
+        if (!res.ok) throw new Error();
+
+        const data = await res.json();
+        showToast(`Successfully deleted ${data.deletedCount} message${data.deletedCount !== 1 ? 's' : ''}`);
+        
+        // Refresh data and clear selection
+        fetchData();
+        
+        // Show success confirmation
+        await Swal.fire({
+          title: 'Deleted!',
+          text: `${data.deletedCount} message${data.deletedCount !== 1 ? 's have' : ' has'} been deleted.`,
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } catch (error) {
+        console.error('Bulk delete error:', error);
+        showToast('Failed to delete messages', true);
+        await Swal.fire({
+          title: 'Error!',
+          text: 'Failed to delete messages. Please try again.',
+          icon: 'error',
+          confirmButtonText: 'OK',
+        });
+      }
+    }
+  };
+
   return (
     <div className="space-y-4">
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-green-600 text-white shadow-lg text-sm font-medium">
-          <Check className="h-4 w-4" /> {toast}
+        <div className={cn(
+          "fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium",
+          toast.includes("Failed") ? "bg-red-600 text-white" : "bg-green-600 text-white"
+        )}>
+          {toast.includes("Failed") ? <XCircle className="h-4 w-4" /> : <Check className="h-4 w-4" />} 
+          {toast}
         </div>
       )}
 
-      {/* Search + refresh */}
+      {/* Search + refresh + bulk actions */}
       <div className="flex gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -139,6 +230,19 @@ export default function ContactSubmissionsList() {
             </button>
           )}
         </div>
+        
+        {/* Bulk Delete Button */}
+        {selectedIds.size > 0 && (
+          <Button 
+            variant="destructive" 
+            onClick={bulkDelete}
+            className="gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete Selected ({selectedIds.size})
+          </Button>
+        )}
+        
         <Button variant="outline" size="icon" onClick={fetchData} disabled={loading} title="Refresh">
           <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
         </Button>
@@ -186,13 +290,21 @@ export default function ContactSubmissionsList() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={(e) => setSelectAll(e.target.checked)}
+                    className="rounded border-gray-300 cursor-pointer"
+                  />
+                </th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Sender</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Subject</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Message</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Received</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Actions</th>
-              </tr>
+               </tr>
             </thead>
             <tbody>
               {items.map((item) => (
@@ -201,6 +313,16 @@ export default function ContactSubmissionsList() {
                     "border-b transition-colors hover:bg-muted/20",
                     item.isResolved && "opacity-70"
                   )}>
+                  {/* Checkbox */}
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.id)}
+                      onChange={() => toggleSelection(item.id)}
+                      className="rounded border-gray-300 cursor-pointer"
+                    />
+                  </td>
+                  
                   {/* Sender */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
@@ -211,21 +333,21 @@ export default function ContactSubmissionsList() {
                       <Mail className="h-3 w-3 text-muted-foreground shrink-0" />
                       <span className="text-xs text-muted-foreground">{item.email}</span>
                     </div>
-                  </td>
+                   </td>
 
                   {/* Subject */}
                   <td className="px-4 py-3 hidden md:table-cell max-w-[180px]">
                     <p className="line-clamp-1 text-sm">
                       {item.subject ?? <span className="text-muted-foreground italic">No subject</span>}
                     </p>
-                  </td>
+                   </td>
 
                   {/* Message preview */}
                   <td className="px-4 py-3 hidden lg:table-cell max-w-xs">
                     <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                       {item.message}
                     </p>
-                  </td>
+                   </td>
 
                   {/* Status */}
                   <td className="px-4 py-3">
@@ -238,7 +360,7 @@ export default function ContactSubmissionsList() {
                       {item.isResolved ? <Check className="h-3 w-3" /> : <MessageSquare className="h-3 w-3" />}
                       {item.isResolved ? "Resolved" : "Open"}
                     </span>
-                  </td>
+                   </td>
 
                   {/* Date */}
                   <td className="px-4 py-3 hidden sm:table-cell text-xs text-muted-foreground whitespace-nowrap">
@@ -249,7 +371,7 @@ export default function ContactSubmissionsList() {
                         {item.resolverName ? ` by ${item.resolverName}` : ""}
                       </p>
                     )}
-                  </td>
+                   </td>
 
                   {/* Actions */}
                   <td className="px-4 py-3">
@@ -272,11 +394,11 @@ export default function ContactSubmissionsList() {
                         {item.isResolved ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                   </td>
+                 </tr>
               ))}
             </tbody>
-          </table>
+           </table>
         </div>
       )}
 
