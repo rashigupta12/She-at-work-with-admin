@@ -6,6 +6,7 @@ import Cta from "@/components/common/Cta";
 import { blogsConfig } from "@/lib/pageConfigs";
 import type { BaseApiResponse } from "@/components/content/types";
 import { ContentBanner, ContentGridClient, FeaturedSection, fetchInitialContent } from "@/components/content";
+import { BannerDisplay } from "@/components/bannerNew/BannerDisplay";
 
 export const revalidate = 60;
 
@@ -27,12 +28,18 @@ export default async function BlogsPage() {
     <main className="bg-background min-h-screen">
       <Navbar />
 
-      <ContentBanner
+      {/* <ContentBanner
         bannerDesktop={blogsConfig.bannerDesktop}
         bannerMobile={blogsConfig.bannerMobile}
         bannerAlt={blogsConfig.bannerAlt}
         bannerTitle={blogsConfig.bannerTitle}
         bannerSubtitle={blogsConfig.bannerSubtitle}
+      /> */}
+
+      <BannerDisplay 
+        page="/blogs" 
+        position="top" 
+        autoPlayInterval={4000}
       />
 
       <FeaturedSection

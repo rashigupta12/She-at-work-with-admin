@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { UploadImageSvg } from "@/components/svgs/page";
+// import { UploadImageSvg } from "@/components/svgs/page";
 import Swal from "sweetalert2";
 
 const IMG_URL = process.env.NEXT_PUBLIC_IMG_URL || "";
@@ -280,7 +280,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   htmlFor="upload-image"
                   className="flex flex-col items-center gap-5 py-24 cursor-pointer"
                 >
-                  <UploadImageSvg h="80" w="80" color="#C4C4C4" />
+                  {/* <UploadImageSvg h="80" w="80" color="#C4C4C4" /> */}
                   <div className="font-semibold text-lg text-gray-700">
                     Choose Your Image to Upload
                   </div>
