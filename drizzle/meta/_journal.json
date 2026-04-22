@@ -50,6 +50,13 @@
       "when": 1773307639053,
       "tag": "0007_complete_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776754179275,
+      "tag": "0008_charming_lockheed",
+      "breakpoints": true
     }
   ]
 }

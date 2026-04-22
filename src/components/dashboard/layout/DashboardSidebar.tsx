@@ -3,7 +3,7 @@
 
 import { cn } from "@/lib/utils";
 import {
-  BookOpen, ChevronRight,
+  BookOpen, Box, ChevronRight,
   FolderTree, Home, Mail, Shield, TrendingUp
 } from "lucide-react";
 import Link from "next/link";
@@ -62,6 +62,14 @@ const NAV_ITEMS: NavItem[] = [
     href:  "/dashboard/admin/contact-submissions",
     label: "Contact Messages",
     icon:  <Mail className="h-5 w-5" />,
+    roles: ["ADMIN"],
+    group: "admin",
+  },
+
+    {
+    href:  "/dashboard/admin/banner",
+    label: "Banner",
+    icon:  <Box className="h-5 w-5" />,
     roles: ["ADMIN"],
     group: "admin",
   },

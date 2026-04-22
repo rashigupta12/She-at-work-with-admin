@@ -44,6 +44,30 @@ export const resourceScopeEnum = pgEnum("resource_scope", [
   "GLOBAL",
 ]);
 
+// Banner Enums
+export const ScreenTypeEnum = pgEnum("screen_type", [
+  "DESKTOP",
+  "TABLET",
+  "MOBILE",
+]);
+
+export const BannerStatusEnum = pgEnum("banner_status", [
+  "DRAFT",
+  "ACTIVE",
+  "INACTIVE",
+  "SCHEDULED",
+]);
+
+export const BannerElementTypeEnum = pgEnum("banner_element_type", [
+  "TEXT",
+  "BUTTON",
+]);
+
+export const IconPositionEnum = pgEnum("icon_position", [
+  "left",
+  "right",
+]);
+
 ////////////////////////////////////////////////////////////
 //////////////////// USERS //////////////////////////////////
 ////////////////////////////////////////////////////////////
@@ -151,8 +175,6 @@ export const CategoriesTable = pgTable(
 
     index("categories_active_idx").on(table.isActive),
 
-    // ADDED: composite index for the common query pattern:
-    // fetch active categories filtered by content type
     index("categories_content_type_active_idx").on(
       table.contentType,
       table.isActive
@@ -182,7 +204,6 @@ export const TagsTable = pgTable(
 
     uniqueIndex("tags_slug_key").on(table.slug),
 
-    // ADDED: descending usage count so "popular tags" queries are fast
     index("tags_usage_count_desc_idx").on(table.usageCount),
   ]
 );
@@ -242,19 +263,11 @@ export const ContentTable = pgTable(
   },
 
   (table) => [
-    //////////////////////////////////////////////////////////
-    // UNIQUE INDEXES
-    //////////////////////////////////////////////////////////
-
     uniqueIndex("content_slug_key").on(table.slug),
 
     uniqueIndex("content_wp_id_key")
       .on(table.wpId)
       .where(sql`${table.wpId} IS NOT NULL`),
-
-    //////////////////////////////////////////////////////////
-    // SINGLE-COLUMN INDEXES
-    //////////////////////////////////////////////////////////
 
     index("content_type_idx").on(table.contentType),
 
@@ -264,34 +277,22 @@ export const ContentTable = pgTable(
 
     index("content_published_at_idx").on(table.publishedAt),
 
-    // ADDED: createdAt DESC — matches ORDER BY in the admin list GET handler
     index("content_created_at_desc_idx").on(table.createdAt),
 
-    // ADDED: FK index for the LEFT JOIN to users (creator lookup)
     index("content_created_by_idx").on(table.createdBy),
 
-    //////////////////////////////////////////////////////////
-    // COMPOSITE INDEXES
-    //////////////////////////////////////////////////////////
-
-    // Most important for the frontend public pages:
-    // WHERE content_type = ? AND status = 'PUBLISHED' ORDER BY published_at DESC
     index("content_type_status_published_idx").on(
       table.contentType,
       table.status,
       table.publishedAt
     ),
 
-    // Admin list page: WHERE content_type = ? AND status = ? ORDER BY created_at DESC
-    // ADDED: covers the two most common admin filter combinations in one index
     index("content_type_status_created_idx").on(
       table.contentType,
       table.status,
       table.createdAt
     ),
 
-    // Related posts widget:
-    // WHERE category_id = ? AND status = 'PUBLISHED' ORDER BY published_at DESC
     index("content_related_query_idx").on(
       table.categoryId,
       table.status,
@@ -371,12 +372,79 @@ export const ResourcesTable = pgTable(
       table.locationKey
     ),
 
-    // ADDED: filter active resources by scope + location in one index
     index("resources_scope_location_active_idx").on(
       table.scope,
       table.locationKey,
       table.isActive
     ),
+  ]
+);
+
+////////////////////////////////////////////////////////////
+//////////////////// BANNERS TABLE //////////////////////////
+////////////////////////////////////////////////////////////
+
+export const BannersTable = pgTable(
+  "banners",
+  {
+    id: uuid("id").defaultRandom().primaryKey().notNull(),
+
+    // Identity
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description"),
+
+    // Targeting
+    screenType: ScreenTypeEnum("screen_type").notNull(),
+    page: text("page").notNull(),
+    position: text("position").default("top").notNull(),
+
+    // Canvas
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+
+    // Background
+    backgroundColor: text("background_color").default("#ffffff"),
+    backgroundImageUrl: text("background_image_url"),
+    backgroundImageAlt: text("background_image_alt"),
+    backgroundSize: text("background_size").default("cover"),
+    backgroundPosition: text("background_position").default("center"),
+
+    // Elements - stored as JSONB array
+    elements: jsonb("elements").default([]).notNull(),
+
+    // Scheduling & status
+    status: BannerStatusEnum("status").default("DRAFT").notNull(),
+    startsAt: timestamp("starts_at", { mode: "date" }),
+    endsAt: timestamp("ends_at", { mode: "date" }),
+    priority: integer("priority").default(0).notNull(),
+
+    // Audit
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => UsersTable.id, { onDelete: "restrict" }),
+    updatedBy: uuid("updated_by").references(() => UsersTable.id, {
+      onDelete: "set null",
+    }),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // Indexes for banners
+    index("banners_status_idx").on(table.status),
+    index("banners_slug_screen_idx").on(table.slug, table.screenType),
+    index("banners_screen_page_position_idx").on(
+      table.screenType,
+      table.page,
+      table.position
+    ),
+    index("banners_priority_idx").on(table.priority),
+    index("banners_status_dates_idx").on(table.status, table.startsAt, table.endsAt),
+    index("banners_dates_idx").on(table.startsAt, table.endsAt),
+    index("banners_created_by_idx").on(table.createdBy),
+    index("banners_updated_by_idx").on(table.updatedBy),
   ]
 );
 
@@ -410,12 +478,8 @@ export const StorySubmissionsTable = pgTable(
   },
   (table) => [
     index("story_submissions_status_idx").on(table.status),
-
     index("story_submissions_submitted_at_idx").on(table.submittedAt),
-
     index("story_submissions_reviewed_by_idx").on(table.reviewedBy),
-
-    // ADDED: admin review queue — pending items ordered by submission date
     index("story_submissions_status_submitted_idx").on(
       table.status,
       table.submittedAt
@@ -446,12 +510,8 @@ export const ContactSubmissionsTable = pgTable(
   },
   (table) => [
     index("contact_submissions_resolved_idx").on(table.isResolved),
-
     index("contact_submissions_submitted_at_idx").on(table.submittedAt),
-
     index("contact_submissions_resolved_by_idx").on(table.resolvedBy),
-
-    // ADDED: unresolved items ordered by date — used by the admin inbox view
     index("contact_submissions_resolved_submitted_idx").on(
       table.isResolved,
       table.submittedAt
@@ -527,10 +587,27 @@ export const contactSubmissionRelations = relations(
   })
 );
 
+// Banner Relations
+export const bannersRelations = relations(BannersTable, ({ one }) => ({
+  createdByUser: one(UsersTable, {
+    fields: [BannersTable.createdBy],
+    references: [UsersTable.id],
+    relationName: "createdBanners",
+  }),
+  updatedByUser: one(UsersTable, {
+    fields: [BannersTable.updatedBy],
+    references: [UsersTable.id],
+    relationName: "updatedBanners",
+  }),
+}));
+
+// Updated User Relations with Banners
 export const userRelations = relations(UsersTable, ({ many }) => ({
   posts: many(ContentTable),
   storyReviews: many(StorySubmissionsTable),
   contactResolutions: many(ContactSubmissionsTable),
+  createdBanners: many(BannersTable, { relationName: "createdBanners" }),
+  updatedBanners: many(BannersTable, { relationName: "updatedBanners" }),
 }));
 
 ////////////////////////////////////////////////////////////
@@ -560,3 +637,7 @@ export type NewStorySubmission = typeof StorySubmissionsTable.$inferInsert;
 
 export type ContactSubmission = typeof ContactSubmissionsTable.$inferSelect;
 export type NewContactSubmission = typeof ContactSubmissionsTable.$inferInsert;
+
+// Banner Types
+export type Banner = typeof BannersTable.$inferSelect;
+export type NewBanner = typeof BannersTable.$inferInsert;
