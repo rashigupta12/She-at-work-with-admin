@@ -86,15 +86,15 @@ export type View = "list" | "builder";
 export type MobilePanel = "layers" | "config" | "properties";
 
 export const SCREEN_MIN_SIZES: Record<ScreenType, { width: number; height: number }> = {
-  DESKTOP: { width: 1920, height: 750 },
+  DESKTOP: { width: 3156, height: 765 },
   TABLET: { width: 1024, height: 480 },
-  MOBILE: { width: 1080 , height: 1600 },
+  MOBILE: { width: 1081 , height: 1101 },
 };
 
 export const SCREEN_PRESETS: Record<ScreenType, { width: number; height: number }> = {
-  DESKTOP: { width: 1920, height: 750 },
+  DESKTOP: { width: 3156, height: 765 },
   TABLET: { width: 1024, height: 480 },
-  MOBILE: { width: 1080 , height: 1600 },
+  MOBILE: { width: 1081 , height: 1101 },
 };
 
 export const STATUS_COLORS: Record<BannerStatus, string> = {
@@ -115,7 +115,7 @@ export const defaultBanner = (): CreateBannerInput => ({
   page: "/blogs",
   position: "top",
   width: 3156,
-  height: 750,
+  height: 765,
   backgroundColor: "#f1f5f9",
   backgroundImageUrl: "",
   backgroundImageAlt: "",

@@ -6,6 +6,8 @@ import Cta from "@/components/common/Cta";
 import { newsConfig } from "@/lib/pageConfigs";
 import type { BaseApiResponse } from "@/components/content/types";
 import { ContentBanner, ContentGridClient, FeaturedSection, fetchInitialContent } from "@/components/content";
+import TopHeaderSection from "@/components/common/TopHeaderSection";
+import { BannerDisplay } from "@/components/bannerNew/BannerDisplay";
 
 // ISR: page HTML rebuilt every 60 seconds in the background.
 // Returning visitors get instant cached HTML — no blank screen, no waterfall.
@@ -30,14 +32,19 @@ export default async function NewsPage() {
       <Navbar />
 
       {/* ── Server-rendered, zero JS ──────────────────────────────────── */}
-      <ContentBanner
+      {/* <ContentBanner
         bannerDesktop={newsConfig.bannerDesktop}
         bannerMobile={newsConfig.bannerMobile}
         bannerAlt={newsConfig.bannerAlt}
         bannerTitle={newsConfig.bannerTitle}
         bannerSubtitle={newsConfig.bannerSubtitle}
+      /> */}
+      <TopHeaderSection/>
+      <BannerDisplay 
+        page="/news" 
+        position="top" 
+        autoPlayInterval={4000}
       />
-
       <FeaturedSection
         featuredItem={featured}
         latestItems={headlines}

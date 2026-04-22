@@ -7,6 +7,7 @@ import { blogsConfig } from "@/lib/pageConfigs";
 import type { BaseApiResponse } from "@/components/content/types";
 import { ContentBanner, ContentGridClient, FeaturedSection, fetchInitialContent } from "@/components/content";
 import { BannerDisplay } from "@/components/bannerNew/BannerDisplay";
+import TopHeaderSection from "@/components/common/TopHeaderSection";
 
 export const revalidate = 60;
 
@@ -35,7 +36,7 @@ export default async function BlogsPage() {
         bannerTitle={blogsConfig.bannerTitle}
         bannerSubtitle={blogsConfig.bannerSubtitle}
       /> */}
-
+      <TopHeaderSection/>
       <BannerDisplay 
         page="/blogs" 
         position="top" 
